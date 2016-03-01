@@ -82,7 +82,6 @@
 2. 一个被系统认为是符合规范的硬盘主引导扇区的特征是什么？
    
     > 主引导扇区的读取代码在`tools/sign.c`中，该文件完成了特征的标记。
-
     ```
     if (st.st_size > 510) {
         fprintf(stderr, "%lld >> 510!!\n", (long long)st.st_size);
@@ -102,23 +101,21 @@
 1. 从CPU加电后执行的第一条指令开始，单步跟踪BIOS的执行。
 
     > 修改lab1init文件
-
-        ```
-        file bin/kernel
-        target remote :1234
-        set architecture i8086
-        b *0x7c00
-        ```
+    ```
+    file bin/kernel
+    target remote :1234
+    set architecture i8086
+    b *0x7c00
+    ```
 
     > 在命令行中运行`make lab1-mon`，则程序会在BIOS的第一条指令处，可以通过`si`命令进行单步调试。
 
 2. 在初始化位置0x7c00设置实地址断点,测试断点正常。
 
     > 在gdb中输入如下命令设置断点
-
-        ```
-        (gdb) b *0x7c00
-        ```
+    ```
+    (gdb) b *0x7c00
+    ```
 
     > 运行c继续执行，则程序会在0x7c00停下来
 
@@ -127,25 +124,23 @@
     > 不修改lab1init，运行`make lab1-mon`后，在gdb中通过`si`命令单步执行。
 
     > 或者通过使用 `x /5i $pc` 查看当前 PC 寄存器指向的地址及之后的 5 条指令。
-
-        ```
-        => 0x7c00:      cli
-           0x7c01:      cld
-           0x7c02:      xor    %ax,%ax
-           0x7c04:      mov    %ax,%ds
-           0x7c06:      mov    %ax,%es
-        ```
+    ```
+    => 0x7c00:      cli
+       0x7c01:      cld
+       0x7c02:      xor    %ax,%ax
+       0x7c04:      mov    %ax,%ds
+       0x7c06:      mov    %ax,%es
+    ```
 
     > 通过比对可以发现，程序所执行的汇编代码跟`bootasm.S`中的代码相同。
 
 4. 自己找一个bootloader或内核中的代码位置，设置断点并进行测试。
 
     > 在gdb中输入
-
-        ```
-        (gdb) b kern_init
-        (gdb) c
-        ```
+    ```
+    (gdb) b kern_init
+    (gdb) c
+    ```
 
     > 则程序顺利停止在kern_init函数中
 
