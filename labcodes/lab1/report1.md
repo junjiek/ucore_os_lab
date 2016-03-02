@@ -238,3 +238,11 @@
     ```
     call bootmain
     ```
+
+## 练习4：分析bootloader加载ELF格式的OS的过程
+1. bootloader如何读取硬盘扇区的？
+
+
+
+2. bootloader是如何加载ELF格式的OS？
+
