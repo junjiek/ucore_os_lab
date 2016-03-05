@@ -242,7 +242,77 @@
 ## 练习4：分析bootloader加载ELF格式的OS的过程
 1. bootloader如何读取硬盘扇区的？
 
+    > 调用`readseg`函数，再调用`readect`函数依次读取磁盘扇区。
+    > `readsect`函数从设备的第secno扇区读取数据到dst位置。读取磁盘扇区的时候，先等待硬盘就绪，然后向相应端口0x1F2到0x1F7写入需要的数据，再次等待硬盘就绪，然后读取扇区数据。
+```
+    static void
+    readsect(void *dst, uint32_t secno) {
+        waitdisk();
+    
+        outb(0x1F2, 1);                         // 设置读取扇区的数目为1
+        outb(0x1F3, secno & 0xFF);
+        outb(0x1F4, (secno >> 8) & 0xFF);
+        outb(0x1F5, (secno >> 16) & 0xFF);
+        outb(0x1F6, ((secno >> 24) & 0xF) | 0xE0);
+        // 将32位的磁盘号secno分成四段，每段8位，依次写入0x1F6~0x1F3
 
+        outb(0x1F7, 0x20);                      // 0x20命令，读取扇区
+    
+        waitdisk();
+
+        insl(0x1F0, dst, SECTSIZE / 4);         // 读取数据到dst位置
+    }
+```
+
+    > `readseg`函数简单包装了`readsect`，可以从设备读取任意长度的内容。
+```
+    static void
+    readseg(uintptr_t va, uint32_t count, uint32_t offset) {
+        uintptr_t end_va = va + count;
+    
+        va -= offset % SECTSIZE;
+    
+        uint32_t secno = (offset / SECTSIZE) + 1; 
+        // 加1因为0扇区被引导占用
+        // ELF文件从1扇区开始
+    
+        for (; va < end_va; va += SECTSIZE, secno ++) {
+            readsect((void *)va, secno);
+        }
+    }
+```
 
 2. bootloader是如何加载ELF格式的OS？
 
+在bootmain函数中，
+```
+    void
+    bootmain(void) {
+        // 首先读取ELF的头部，大小为8个扇区
+        readseg((uintptr_t)ELFHDR, SECTSIZE * 8, 0);
+    
+        // 通过储存在头部的幻数判断是否是合法的ELF文件
+        if (ELFHDR->e_magic != ELF_MAGIC) {
+            goto bad;
+        }
+    
+        struct proghdr *ph, *eph;
+    
+        // 用ELF文件头中的e_phoff和e_phnum信息来创建程序头，程序头是描述了ELF文件应加载到内存什么位置的描述表头地址
+        ph = (struct proghdr *)((uintptr_t)ELFHDR + ELFHDR->e_phoff);
+        eph = ph + ELFHDR->e_phnum;
+    
+        // 按照描述表将ELF文件中数据载入内存
+        for (; ph < eph; ph ++) {
+            readseg(ph->p_va & 0xFFFFFF, ph->p_memsz, ph->p_offset);
+        }
+
+        // 根据ELF头部储存的入口信息，找到内核的入口
+        ((void (*)(void))(ELFHDR->e_entry & 0xFFFFFF))();
+    
+    bad:
+        outw(0x8A00, 0x8A00);
+        outw(0x8A00, 0x8E00);
+        while (1);
+    }
+```
