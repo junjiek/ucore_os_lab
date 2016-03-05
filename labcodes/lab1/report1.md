@@ -356,5 +356,35 @@
 ```
     > 对比地址可知，在该处程序跳转进入了kernel。`0x7bf8`是程序在进入kernel之后显示函数栈的基准地址。`0x7d68`是程序跳转进入kernel时eip寄存器的值，表示原本应该执行的下一条指令的地址。
 
-## 练习6
+## 练习6：完善中断初始化和处理
+
+1. 中断描述符表（也可简称为保护模式下的中断向量表）中一个表项占多少字节？其中哪几位代表中断处理代码的入口？
+
+struct gatedesc定义如下，一共64bit，即中断向量表一个表项占用8字节。其中2-3字节是段描述符，通过段描述符在GDT中进行索引，找到基地址，再加上IDT中0-1字节和6-7字节拼成位移就可以得到中断处理代码的入口地址。
+
+```
+    /* Gate descriptors for interrupts and traps */
+    struct gatedesc {
+        unsigned gd_off_15_0 : 16;        // low 16 bits of offset in segment
+        unsigned gd_ss : 16;            // segment selector
+        unsigned gd_args : 5;            // # args, 0 for interrupt/trap gates
+        unsigned gd_rsv1 : 3;            // reserved(should be zero I guess)
+        unsigned gd_type : 4;            // type(STS_{TG,IG32,TG32})
+        unsigned gd_s : 1;                // must be 0 (system)
+        unsigned gd_dpl : 2;            // descriptor(meaning new) privilege level
+        unsigned gd_p : 1;                // Present
+        unsigned gd_off_31_16 : 16;        // high bits of offset in segment
+    };
+```
+
+2. 请编程完善kern/trap/trap.c中对中断向量表进行初始化的函数idt_init。在idt_init函数中，依次对所有中断入口进行初始化。使用mmu.h中的SETGATE宏，填充idt数组内容。每个中断的入口由tools/vectors.c生成，使用trap.c中声明的vectors数组即可。
+
+    > 遍历所有可能的中断号，通过`SETGATE(gate, istrap, sel, off, dpl)`宏来完成idt表的建立。其中段选择址`sel`采用kernel代码段，即`GD_KTEXT`，段内偏移地址`off`从`__vectors`向量直接读取， `dpl`则根据特权级的不同来选择。
+
+    > 最后通过`lidt`指令设置IDT的起始地址。
+
+
+3. 请编程完善trap.c中的中断处理函数trap，在对时钟中断进行处理的部分填写trap函数中处理时钟中断的部分，使操作系统每遇到100次时钟中断后，调用print_ticks子程序，向屏幕上打印一行文字”100 ticks”。
+
+    > 遇到时钟中断ticks加1，若ticks能被TICK_NUM整除则调用`print_ticks()`进行输出。
 
