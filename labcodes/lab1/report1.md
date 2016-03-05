@@ -244,7 +244,7 @@
 
     > 调用`readseg`函数，再调用`readect`函数依次读取磁盘扇区。
     > `readsect`函数从设备的第secno扇区读取数据到dst位置。读取磁盘扇区的时候，先等待硬盘就绪，然后向相应端口0x1F2到0x1F7写入需要的数据，再次等待硬盘就绪，然后读取扇区数据。
-```
+    ```
     static void
     readsect(void *dst, uint32_t secno) {
         waitdisk();
@@ -262,10 +262,10 @@
 
         insl(0x1F0, dst, SECTSIZE / 4);         // 读取数据到dst位置
     }
-```
+    ```
 
     > `readseg`函数简单包装了`readsect`，可以从设备读取任意长度的内容。
-```
+    ```
     static void
     readseg(uintptr_t va, uint32_t count, uint32_t offset) {
         uintptr_t end_va = va + count;
@@ -280,12 +280,12 @@
             readsect((void *)va, secno);
         }
     }
-```
+    ```
 
 2. bootloader是如何加载ELF格式的OS？
 
     > 在bootmain函数中，
-```
+    ```
     void
     bootmain(void) {
         // 首先读取ELF的头部，大小为8个扇区
@@ -315,7 +315,7 @@
         outw(0x8A00, 0x8E00);
         while (1);
     }
-```
+    ```
 
 ## 练习5：实现函数调用堆栈跟踪函数
 
@@ -323,7 +323,7 @@
     > 实现过程：在循环中依次输出eip、ebp、参数，并通过print_debuginfo打印调用函数的信息。然后将`ss:[ebp+4]`存着的返回地址赋给eip，将ss:ebp存着caller's ebp赋给ebp，便可以跳转到上一层调用的函数中去。
     > 输出如下，显示了函数调用栈的回溯信息，依次为栈中每层的ebp、eip、函数的（四个）参数、调用函数信息。
 
-```
+    ```
     ebp:0x00007b08 eip:0x001009a6 args0x00010094 0x00000000 0x00007b38 0x00100092 
         kern/debug/kdebug.c:306: print_stackframe+21
     ebp:0x00007b18 eip:0x00100c95 args0x00000000 0x00000000 0x00000000 0x00007b88 
@@ -340,12 +340,12 @@
         kern/init/init.c:28: kern_init+84
     ebp:0x00007bf8 eip:0x00007d68 args0xc031fcfa 0xc08ed88e 0x64e4d08e 0xfa7502a8 
         <unknow>: -- 0x00007d67 --
-```
+    ```
 
     > 最后一行的含义：
     > 其对应的是栈中的第1个函数，即bootmain.c中的bootmain。由于最深一层是载入bootloader的位置，因此深入到该层时调用位置显示为unknown，`0x7d67`为bootloader调用kernel时eip的地址。在bootblock.asm存在下面代码：
 
-```
+    ```
     // call the entry point from the ELF header
     // note: does not return
     ((void (*)(void))(ELFHDR->e_entry & 0xFFFFFF))();
@@ -353,7 +353,8 @@
     7d61:   25 ff ff ff 00          and    $0xffffff,%eax
     7d66:   ff d0                   call   *%eax
     asm volatile ("outb %0, %1" :: "a" (data), "d" (port));
-```
+    ```
+
     > 对比地址可知，在该处程序跳转进入了kernel。`0x7bf8`是程序在进入kernel之后显示函数栈的基准地址。`0x7d68`是程序跳转进入kernel时eip寄存器的值，表示原本应该执行的下一条指令的地址。
 
 ## 练习6：完善中断初始化和处理
@@ -362,7 +363,7 @@
 
 struct gatedesc定义如下，一共64bit，即中断向量表一个表项占用8字节。其中2-3字节是段描述符，通过段描述符在GDT中进行索引，找到基地址，再加上IDT中0-1字节和6-7字节拼成位移就可以得到中断处理代码的入口地址。
 
-```
+    ```
     /* Gate descriptors for interrupts and traps */
     struct gatedesc {
         unsigned gd_off_15_0 : 16;        // low 16 bits of offset in segment
@@ -375,7 +376,7 @@ struct gatedesc定义如下，一共64bit，即中断向量表一个表项占用
         unsigned gd_p : 1;                // Present
         unsigned gd_off_31_16 : 16;        // high bits of offset in segment
     };
-```
+    ```
 
 2. 请编程完善kern/trap/trap.c中对中断向量表进行初始化的函数idt_init。在idt_init函数中，依次对所有中断入口进行初始化。使用mmu.h中的SETGATE宏，填充idt数组内容。每个中断的入口由tools/vectors.c生成，使用trap.c中声明的vectors数组即可。
 
@@ -388,3 +389,67 @@ struct gatedesc定义如下，一共64bit，即中断向量表一个表项占用
 
     > 遇到时钟中断ticks加1，若ticks能被TICK_NUM整除则调用`print_ticks()`进行输出。
 
+## 扩展练习 Challenge 1
+
+    > 在练习6的`idt_init`中，通过SETGATE宏将用户态调用SWITCH_TOK中断的权限打开。
+    > 在`init.c`里的lab1_switch_to_user中，调用T_SWITCH_TOU中断。在lab1_switch_to_kernel中，调用T_SWITCH_TOK中断。
+
+    ```c
+    static void
+    lab1_switch_to_user(void) {
+        asm volatile (
+        "int %0 \n"
+        "movl %%ebp, %%esp \n"
+        :
+        : "i"(T_SWITCH_TOU));
+    }
+
+    static void
+    lab1_switch_to_kernel(void) {
+        asm volatile (
+        "int %0 \n"
+        "movl %%ebp, %%esp \n"
+        :
+        : "i"(T_SWITCH_TOK));
+    }
+    ```
+
+    > 这是内核到用户态的代码。用户态到内核态的代码完全类似，只修改了中断描述符。
+
+    > 修改 trap.c 里的中断处理代码来处理T_SWITCH_TOU及T_SWITCH_TOK。
+
+    ```c
+    case T_SWITCH_TOU:
+        if(tf -> tf_cs != USER_CS) {
+            tf_tou = *tf;
+            // 将iret时会从堆栈弹出的段寄存器进行修改
+            tf_tou.tf_cs = USER_CS;
+            tf_tou.tf_ds = USER_DS;
+            tf_tou.tf_es = USER_DS;
+            tf_tou.tf_ss = USER_DS;
+            tf_tou.tf_esp = (uint32_t)tf + sizeof(struct trapframe) - 8;
+
+            // 在转User态时，将调用io所需权限降低。
+            tf_tou.tf_eflags |= FL_IOPL_MASK;
+
+            * ((uint32_t *)tf - 1) = (uint32_t) & tf_tou;
+        }
+        break;
+    case T_SWITCH_TOK:
+        // panic("T_SWITCH_** ??\n");
+        if(tf -> tf_cs != KERNEL_CS) {
+            tf_tok = *tf;
+            // 将iret时会从堆栈弹出的段寄存器进行修改
+            tf_tok.tf_cs = KERNEL_CS;
+            tf_tok.tf_ds = KERNEL_DS;
+            tf_tok.tf_es = KERNEL_DS;
+            tf_tok.tf_ss = KERNEL_DS;
+            tf_tok.tf_esp = (uint32_t)tf - sizeof(struct trapframe) + 8;
+            tf_tok.tf_eflags &= ~FL_IOPL_MASK;
+
+            * ((uint32_t *)tf - 1) = (uint32_t) & tf_tok;
+        }
+        break;
+    ```
+
+    > `make grade` 可通过全部评测。
