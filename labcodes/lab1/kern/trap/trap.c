@@ -49,10 +49,14 @@ idt_init(void) {
 	extern uintptr_t __vectors[];
 	int i;
 	for (i = 0 ; i < sizeof(idt) / sizeof(struct gatedesc); ++i) {
-        SETGATE(idt[i], 0, GD_KTEXT, __vectors[i], DPL_KERNEL);
+		if (i == T_SYSCALL) {
+			SETGATE(idt[i], 1, GD_KTEXT, __vectors[i], DPL_USER);
+		} else if (i == T_SWITCH_TOK) {
+			SETGATE(idt[i], 0, GD_KTEXT, __vectors[i], DPL_USER);
+		} else {
+			SETGATE(idt[i], 0, GD_KTEXT, __vectors[i], DPL_KERNEL);
+		}
 	}
-	// set for switch from user to kernel
-    SETGATE(idt[T_SWITCH_TOK], 0, GD_KTEXT, __vectors[T_SWITCH_TOK], DPL_USER);
 
 	lidt(&idt_pd);
 	
@@ -145,6 +149,7 @@ print_regs(struct pushregs *regs) {
 }
 
 /* trap_dispatch - dispatch based on what type of trap occurred */
+struct trapframe tf_tou, tf_tok;
 static void
 trap_dispatch(struct trapframe *tf) {
     char c;
@@ -170,8 +175,33 @@ trap_dispatch(struct trapframe *tf) {
         break;
     //LAB1 CHALLENGE 1 : YOUR CODE you should modify below codes.
     case T_SWITCH_TOU:
+        if(tf -> tf_cs != USER_CS) {
+        	tf_tou = *tf;
+
+        	tf_tou.tf_cs = USER_CS;
+        	tf_tou.tf_ds = USER_DS;
+        	tf_tou.tf_es = USER_DS;
+        	tf_tou.tf_ss = USER_DS;
+        	tf_tou.tf_esp = (uint32_t)tf + sizeof(struct trapframe) - 8;
+        	tf_tou.tf_eflags |= FL_IOPL_MASK;
+
+            * ((uint32_t *)tf - 1) = (uint32_t) & tf_tou;
+        }
+        break;
     case T_SWITCH_TOK:
-        panic("T_SWITCH_** ??\n");
+        // panic("T_SWITCH_** ??\n");
+        if(tf -> tf_cs != KERNEL_CS) {
+        	tf_tok = *tf;
+
+        	tf_tok.tf_cs = KERNEL_CS;
+        	tf_tok.tf_ds = KERNEL_DS;
+        	tf_tok.tf_es = KERNEL_DS;
+        	tf_tok.tf_ss = KERNEL_DS;
+        	tf_tok.tf_esp = (uint32_t)tf - sizeof(struct trapframe) + 8;
+        	tf_tok.tf_eflags &= ~FL_IOPL_MASK;
+
+            * ((uint32_t *)tf - 1) = (uint32_t) & tf_tok;
+        }
         break;
     case IRQ_OFFSET + IRQ_IDE1:
     case IRQ_OFFSET + IRQ_IDE2:
