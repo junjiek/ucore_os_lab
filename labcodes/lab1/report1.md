@@ -284,7 +284,7 @@
 
 2. bootloader是如何加载ELF格式的OS？
 
-在bootmain函数中，
+    > 在bootmain函数中，
 ```
     void
     bootmain(void) {
@@ -316,3 +316,45 @@
         while (1);
     }
 ```
+
+## 练习5：实现函数调用堆栈跟踪函数
+
+    > 在C函数调用栈中，`ss:ebp`存着caller's ebp，`ss:[ebp+4]`存着返回地址，`ss:[ebp+8]`之后存着函数调用的参数
+    > 实现过程：在循环中依次输出eip、ebp、参数，并通过print_debuginfo打印调用函数的信息。然后将`ss:[ebp+4]`存着的返回地址赋给eip，将ss:ebp存着caller's ebp赋给ebp，便可以跳转到上一层调用的函数中去。
+    > 输出如下，显示了函数调用栈的回溯信息，依次为栈中每层的ebp、eip、函数的（四个）参数、调用函数信息。
+
+```
+    ebp:0x00007b08 eip:0x001009a6 args0x00010094 0x00000000 0x00007b38 0x00100092 
+        kern/debug/kdebug.c:306: print_stackframe+21
+    ebp:0x00007b18 eip:0x00100c95 args0x00000000 0x00000000 0x00000000 0x00007b88 
+        kern/debug/kmonitor.c:125: mon_backtrace+10
+    ebp:0x00007b38 eip:0x00100092 args0x00000000 0x00007b60 0xffff0000 0x00007b64 
+        kern/init/init.c:48: grade_backtrace2+33
+    ebp:0x00007b58 eip:0x001000bb args0x00000000 0xffff0000 0x00007b84 0x00000029 
+        kern/init/init.c:53: grade_backtrace1+38
+    ebp:0x00007b78 eip:0x001000d9 args0x00000000 0x00100000 0xffff0000 0x0000001d 
+        kern/init/init.c:58: grade_backtrace0+23
+    ebp:0x00007b98 eip:0x001000fe args0x001032fc 0x001032e0 0x0000130a 0x00000000 
+        kern/init/init.c:63: grade_backtrace+34
+    ebp:0x00007bc8 eip:0x00100055 args0x00000000 0x00000000 0x00000000 0x00010094 
+        kern/init/init.c:28: kern_init+84
+    ebp:0x00007bf8 eip:0x00007d68 args0xc031fcfa 0xc08ed88e 0x64e4d08e 0xfa7502a8 
+        <unknow>: -- 0x00007d67 --
+```
+
+    > 最后一行的含义：
+    > 其对应的是栈中的第1个函数，即bootmain.c中的bootmain。由于最深一层是载入bootloader的位置，因此深入到该层时调用位置显示为unknown，`0x7d67`为bootloader调用kernel时eip的地址。在bootblock.asm存在下面代码：
+
+```
+    // call the entry point from the ELF header
+    // note: does not return
+    ((void (*)(void))(ELFHDR->e_entry & 0xFFFFFF))();
+    7d5c:   a1 18 00 01 00          mov    0x10018,%eax
+    7d61:   25 ff ff ff 00          and    $0xffffff,%eax
+    7d66:   ff d0                   call   *%eax
+    asm volatile ("outb %0, %1" :: "a" (data), "d" (port));
+```
+    > 对比地址可知，在该处程序跳转进入了kernel。`0x7bf8`是程序在进入kernel之后显示函数栈的基准地址。`0x7d68`是程序跳转进入kernel时eip寄存器的值，表示原本应该执行的下一条指令的地址。
+
+## 练习6
+
