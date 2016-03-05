@@ -203,7 +203,7 @@ endif
 # files for grade script
 
 TARGETS: $(TARGETS)
-
+all: $(TARGETS)
 .DEFAULT_GOAL := TARGETS
 
 .PHONY: qemu qemu-nox debug debug-nox
@@ -216,6 +216,8 @@ log: $(UCOREIMG)
 qemu-nox: $(UCOREIMG)
 	$(V)$(QEMU)   -no-reboot -serial mon:stdio -hda $< -nographic
 TERMINAL        :=gnome-terminal
+gdb: $(UCOREIMG)
+	$(V)$(QEMU) -S -s -parallel stdio -hda $< -serial null
 debug: $(UCOREIMG)
 	$(V)$(QEMU) -S -s -parallel stdio -hda $< -serial null &
 	$(V)sleep 2
