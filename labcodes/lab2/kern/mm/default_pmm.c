@@ -93,22 +93,22 @@ default_alloc_pages(size_t n) {
         struct Page *page = le2page(le, page_link);
         // Finds a free block.
         if (page->property >= n) {
-        	// Malloc the first n pages.
-        	int i;
-        	for (i = 0; i < n; ++i) {
-        		struct Page* tmp_page = le2page(le, page_link);
-        		ClearPageProperty(tmp_page);
-        		SetPageReserved(tmp_page);
-        		list_del(le);
-        		le = list_next(le);
-        	}
-        	if (page->property > n) {
-        		// Updates the remained space size.
-        		struct Page* new_page = le2page(le, page_link);
-        		new_page->property = page->property - n;
-        	}
-        	page->property = 0;
-        	nr_free -= n;
+            // Malloc the first n pages.
+            int i;
+            for (i = 0; i < n; ++i) {
+                struct Page* tmp_page = le2page(le, page_link);
+                ClearPageProperty(tmp_page);
+                SetPageReserved(tmp_page);
+                list_del(le);
+                le = list_next(le);
+            }
+            if (page->property > n) {
+                // Updates the remained space size.
+                struct Page* new_page = le2page(le, page_link);
+                new_page->property = page->property - n;
+            }
+            page->property = 0;
+            nr_free -= n;
             return page;
         }
     }
@@ -133,9 +133,9 @@ default_free_pages(struct Page *base, size_t n) {
     struct Page *prev_page = NULL;
     struct Page *next_page = NULL;
     while ((le = list_next(le)) != &free_list) {
-    	next_page = le2page(le, page_link);
+        next_page = le2page(le, page_link);
         if (next_page > base) {
-        	break;
+            break;
         }
         prev_page = next_page;
     }
@@ -143,21 +143,21 @@ default_free_pages(struct Page *base, size_t n) {
     // Adds freed space to list.
     int i;
     for (i = 0; i < n; ++i) {
-    	struct Page* new_page = base + i;
-    	list_entry_t* new_le = &(new_page->page_link);
-    	list_add_before(le, new_le);
+        struct Page* new_page = base + i;
+        list_entry_t* new_le = &(new_page->page_link);
+        list_add_before(le, new_le);
     }
 
     // If next_p is adjacent, combine them.
     if (next_page && base + base->property == next_page) {
-    	base->property += next_page->property;
-    	next_page->property = 0;
+        base->property += next_page->property;
+        next_page->property = 0;
     }
 
     // If prev_page is adjacent, combine them.
     if (prev_page && prev_page + prev_page->property == base) {
-    	prev_page->property += base->property;
-    	base->property = 0;
+        prev_page->property += base->property;
+        base->property = 0;
     }
 
     nr_free += n;
