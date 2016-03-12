@@ -67,22 +67,24 @@ default_init(void) {
 
 static void
 default_init_memmap(struct Page *base, size_t n) {
-	assert(n > 0);
-	struct Page *p = base;
-	for (; p != base + n; p ++) {
-		assert(PageReserved(p));
-		p->flags = 0;        // Clears the flags.
-		p->property = 0;     // Not the first page of free block.
-		set_page_ref(p, 0);  // Free and no reference.
-	}
-	SetPageProperty(base);  // Valid page.
-	list_add(&free_list, &(base->page_link));  // Links this page to free_list
-	base->property = n;     // First page of n free blocks.
-	nr_free += n;
+//    ---------- Version 0 --------
+    assert(n > 0);
+    struct Page *p = base;
+    for (; p != base + n; p ++) {
+        assert(PageReserved(p));
+        p->flags = 0;        // Clears the flags.
+        p->property = 0;     // Not the first page of free block.
+        set_page_ref(p, 0);  // Free and no reference.
+        SetPageProperty(p);  // Valid page.
+        list_add_before(&free_list, &(p->page_link));  // Links this page to free_list
+    }
+    base->property = n;     // First page of n free blocks.
+    nr_free += n;
 }
 
 static struct Page *
 default_alloc_pages(size_t n) {
+//    ----------  Version 0 --------
     assert(n > 0);
     if (n > nr_free) {
         return NULL;
@@ -93,15 +95,18 @@ default_alloc_pages(size_t n) {
         // Finds a free block.
         if (page->property >= n) {
             // Malloc the first n pages.
-            ClearPageProperty(page);
-			SetPageReserved(page);
-			list_del(le);
-
+            int i;
+            for (i = 0; i < n; ++i) {
+                struct Page* tmp_page = le2page(le, page_link);
+                ClearPageProperty(tmp_page);
+                SetPageReserved(tmp_page);
+                list_del(le);
+                le = list_next(le);
+            }
             if (page->property > n) {
                 // Updates the remained space size.
-                struct Page* new_page = page + n;
+                struct Page* new_page = le2page(le, page_link);
                 new_page->property = page->property - n;
-                list_add_before(list_next(le), &(new_page->page_link));
             }
             page->property = 0;
             nr_free -= n;
@@ -113,12 +118,16 @@ default_alloc_pages(size_t n) {
 
 static void
 default_free_pages(struct Page *base, size_t n) {
+//    ---------- Version 0 --------
     assert(n > 0);
     // Frees the pages;
-	base->flags = 0;        // Clears the flags.
-	base->property = 0;     // Not the first page of free block.
-	set_page_ref(base, 0);  // Free and no reference.
-	SetPageProperty(base);
+    struct Page *p = base;
+    for (; p != base + n; p ++) {
+        p->flags = 0;        // Clears the flags.
+        p->property = 0;     // Not the first page of free block.
+        set_page_ref(p, 0);  // Free and no reference.
+        SetPageProperty(p);  // Valid page.
+    }
     base->property = n;      // First page of n free blocks.
 
     // Finds the insertion position.
@@ -134,22 +143,23 @@ default_free_pages(struct Page *base, size_t n) {
     }
 
     // Adds freed space to list.
-    list_add_before(le, &(base->page_link));
+    int i;
+    for (i = 0; i < n; ++i) {
+        struct Page* new_page = base + i;
+        list_entry_t* new_le = &(new_page->page_link);
+        list_add_before(le, new_le);
+    }
 
     // If next_p is adjacent, combine them.
     if (next_page && base + base->property == next_page) {
         base->property += next_page->property;
-        ClearPageProperty(next_page);
         next_page->property = 0;
-        list_del(&(next_page->page_link));
     }
 
     // If prev_page is adjacent, combine them.
     if (prev_page && prev_page + prev_page->property == base) {
         prev_page->property += base->property;
-        ClearPageProperty(base);
         base->property = 0;
-        list_del(&(base->page_link));
     }
 
     nr_free += n;
@@ -285,4 +295,3 @@ const struct pmm_manager default_pmm_manager = {
     .nr_free_pages = default_nr_free_pages,
     .check = default_check,
 };
-
