@@ -25,7 +25,6 @@ process state       :     meaning               -- reason
     PROC_SLEEPING   :   sleeping                -- try_free_pages, do_wait, do_sleep
     PROC_RUNNABLE   :   runnable(maybe running) -- proc_init, wakeup_proc, 
     PROC_ZOMBIE     :   almost dead             -- do_exit
-
 -----------------------------
 process state changing:
                                             
@@ -56,7 +55,6 @@ SYS_sleep       : process sleep                           -->do_sleep
 SYS_kill        : kill process                            -->do_kill-->proc->flags |= PF_EXITING
                                                                  -->wakeup_proc-->do_wait-->do_exit   
 SYS_getpid      : get the process's pid
-
 */
 
 // the process set's list
@@ -885,4 +883,3 @@ cpu_idle(void) {
         }
     }
 }
-
