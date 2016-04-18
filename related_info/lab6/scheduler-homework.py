@@ -55,13 +55,46 @@ print '\n'
 if options.solve == True:
     print '** Solutions **\n'
     if options.policy == 'SJF':
-		#YOUR CODE
-    	pass
-    	
+        #YOUR CODE
+        joblist = sorted(joblist, key=lambda job : job[1])
+        thetime = 0
+        print 'Execution trace:'
+        for tmp in joblist:
+            jobnum  = tmp[0]
+            runtime = tmp[1]
+            print '  [ time %3d ] Run job %3d for %.2f secs ( DONE at %.2f )' % (thetime, jobnum, runtime, thetime + runtime)
+            thetime += runtime
+
+        print '\nFinal statistics:'
+        t     = 0.0
+        count = 0
+        turnaroundSum = 0.0
+        waitSum       = 0.0
+        responseSum   = 0.0
+        for tmp in joblist:
+            jobnum  = tmp[0]
+            runtime = tmp[1]
+
+            response   = t
+            turnaround = t + runtime
+            wait       = t
+            print '  Job %3d -- Response: %3.2f  Turnaround %3.2f  Wait %3.2f' % (jobnum, response, turnaround, wait)
+            responseSum   += response
+            turnaroundSum += turnaround
+            waitSum       += wait
+            t += runtime
+            count = count + 1
+        print '\n  Average -- Response: %3.2f  Turnaround %3.2f  Wait %3.2f\n' % (responseSum/count, turnaroundSum/count, waitSum/count)
+        
     if options.policy == 'FIFO':
         thetime = 0
         print 'Execution trace:'
-		#YOUR CODE
+        #YOUR CODE
+        for tmp in joblist:
+            jobnum  = tmp[0]
+            runtime = tmp[1]
+            print '  [ time %3d ] Run job %3d for %.2f secs ( DONE at %.2f )' % (thetime, jobnum, runtime, thetime + runtime)
+            thetime += runtime
          
         print '\nFinal statistics:'
         t     = 0.0
@@ -72,7 +105,7 @@ if options.solve == True:
         for tmp in joblist:
             jobnum  = tmp[0]
             runtime = tmp[1]
-            
+
             response   = t
             turnaround = t + runtime
             wait       = t
@@ -114,7 +147,7 @@ if options.solve == True:
             wait[jobnum] += currwait
             ranfor = 0
             if runtime > quantum:
-				#YOUR CODE
+                #YOUR CODE
                 print '  [ time %3d ] Run job %3d for %.2f secs' % (thetime, jobnum, ranfor)
                 runlist.append([jobnum, runtime])
             else:
