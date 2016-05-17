@@ -286,6 +286,32 @@ class fs:
     # DONE
         return tinum
 
+    def createSoftLink(self, target, newfile, parent):
+        parent_inode = self.inodes[self.nameToInum[parent]]
+        parent_dataBlock = self.data[parent_inode.getAddr()]
+        if parent_dataBlock.getFreeEntries() > 0:
+            if parent_dataBlock.dirEntryExists(newfile):
+                return -1
+            else:
+                new_inodeNum = self.inodeAlloc()
+                tinum = new_inodeNum
+                if new_inodeNum < 0:
+                    return -1
+                new_inode = self.inodes[new_inodeNum]
+                new_dataBlockNum = self.dataAlloc()
+                if new_dataBlockNum < 0:
+                    return -1
+                new_dataBlock = self.data[new_dataBlockNum]
+                new_inode.setAddr(new_dataBlockNum)
+                new_inode.setAll('f' , new_dataBlockNum , 1)
+                new_dataBlock.setType('f')
+                new_dataBlock.setTarget(target)
+                parent_inode.incRefCnt()
+                parent_dataBlock.addDirEntry(newfile , new_inodeNum)
+        else:
+            return -1
+        return tinum
+
     def createFile(self, parent, newfile, ftype):
     # YOUR CODE, 2012011335
         # find info about parent
